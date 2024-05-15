@@ -127,6 +127,7 @@ tid_t thread_create(const char *name, int priority, thread_func *, void *);
 void thread_block(void);
 void thread_unblock(struct thread *);
 bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool cmp_sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 void preemption_priority(void);
 
 struct thread *thread_current(void);
