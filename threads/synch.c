@@ -67,11 +67,11 @@ void sema_down(struct semaphore *sema)
 	old_level = intr_disable();
 	while (sema->value == 0)
 	{
-		list_push_back(&sema->waiters, &thread_current()->elem);
-		// list_insert_ordered(&sema->waiters, &thread_current()->elem, cmp_priority, NULL); // 우선순위 정렬 추가된 코드
-
+		// list_push_back(&sema->waiters, &thread_current()->elem);
+		list_insert_ordered(&sema->waiters, &thread_current()->elem, cmp_priority, NULL); // 우선순위 정렬 추가된 코드
 		thread_block();
 	}
+
 	sema->value--;
 	intr_set_level(old_level);
 }
@@ -107,16 +107,25 @@ bool sema_try_down(struct semaphore *sema)
    This function may be called from an interrupt handler. */
 void sema_up(struct semaphore *sema)
 {
+	// waiter list를 우선순위에 따라 정렬한다.
+	// waiter list의 스레드 우선 순위를 변경하는 경우를 고려하라.
+
 	enum intr_level old_level;
 
 	ASSERT(sema != NULL);
 
-	old_level = intr_disable();
+	old_level = intr_disable(); // 인터럽트 비활성화
+
 	if (!list_empty(&sema->waiters))
-		thread_unblock(list_entry(list_pop_front(&sema->waiters),
-								  struct thread, elem));
-	sema->value++;
-	intr_set_level(old_level);
+	{
+		// waiters list 우선순위 순서로 정렬
+		list_sort(&sema->waiters, cmp_priority, NULL);
+		thread_unblock(list_entry(list_pop_front(&sema->waiters), struct thread, elem));
+	}
+
+	sema->value++;			   // value 1증가
+	preemption_priority();	   // 선점 추가한 코드
+	intr_set_level(old_level); // 인터럽트 활성화
 }
 
 static void sema_test_helper(void *sema_);

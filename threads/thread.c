@@ -31,9 +31,6 @@ static struct list ready_list;
 // 스레드 sleep 상태를 보관하기 위한 list
 static struct list sleep_list;
 
-// 스레드 대기 상태를 보관하기 위한 list
-static struct list wait_list;
-
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -269,7 +266,6 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
-	// t->priority = PRI_DEFAULT; // 스레드 우선순위 기본값으로 초기화
 
 	/* Add to run queue. */
 	// 실행 대기열에 추가한다
@@ -280,6 +276,14 @@ tid_t thread_create(const char *name, int priority,
 
 	현재 실행중인 스레드와 새롭게 들어오는 스레드의 우선순위를 비교하라.
 	만약 새로 도착한 스레드의 우선순위가 더 높다면 CPU를 양보하라.*/
+
+	// 선점 코드 추가
+	// 우선순위 비교 -> 대기하고있는 스레드가 현재 스레드보다 우선순위가 커지면 선점하기
+	if (t->priority > thread_current()->priority)
+	{
+		thread_yield();
+	}
+
 	return tid;
 }
 
@@ -502,6 +506,7 @@ void thread_wakeup(int64_t wakeup_ticks)
 			enum intr_level old_level = intr_disable(); // 인터럽트 비활성화
 			list_remove(curr);							// 수면큐에서 깨울 스레드 지우기
 			thread_unblock(thread_a);					// 스레드 차단 해제
+			preemption_priority();						// 선점추가
 		}
 		// 깨어날 스레드가 없으면 return
 		else
@@ -509,12 +514,8 @@ void thread_wakeup(int64_t wakeup_ticks)
 	}
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
-/* 현재 스레드의 우선순위를 NEW_PRIORITY로 설정합니다.
-
- 이 코드는 현재 실행 중인 스레드의 우선순위를 새로운 값인 NEW_PRIORITY로 변경하는 기능을 설명합니다.
- 이는 스레드 스케줄링에 있어서 해당 스레드의 실행 우선 순위를 조정하는 데 사용됩니다.*/
-void thread_set_priority(int new_priority)
+// 선점 함수
+void preemption_priority(void)
 {
 	// 현재 스레드가 idel 스레드이면 return
 	if (thread_current() == idle_thread)
@@ -528,9 +529,6 @@ void thread_set_priority(int new_priority)
 		return;
 	}
 
-	thread_current()->priority = new_priority;
-
-	// 선점 코드 추가
 	struct list_elem *first_item;
 	struct thread *first_thread;
 
@@ -540,9 +538,21 @@ void thread_set_priority(int new_priority)
 	// 우선순위 비교 -> 대기하고있는 스레드가 현재 스레드보다 우선순위가 커지면 선점하기
 	if ((is_thread(first_thread)) && (first_thread->priority > thread_current()->priority))
 	{
-		// list_remove(first_item);
 		thread_yield();
 	}
+}
+
+/* Sets the current thread's priority to NEW_PRIORITY. */
+/* 현재 스레드의 우선순위를 NEW_PRIORITY로 설정합니다.
+
+ 이 코드는 현재 실행 중인 스레드의 우선순위를 새로운 값인 NEW_PRIORITY로 변경하는 기능을 설명합니다.
+ 이는 스레드 스케줄링에 있어서 해당 스레드의 실행 우선 순위를 조정하는 데 사용됩니다.*/
+void thread_set_priority(int new_priority)
+{
+	thread_current()->priority = new_priority;
+
+	// 선점 코드 추가
+	preemption_priority();
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
