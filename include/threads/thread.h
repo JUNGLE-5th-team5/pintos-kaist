@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -95,6 +96,12 @@ struct thread
 	int64_t local_tick;		   // 일어날 시간 변수 저장
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */
+
+	// donation 추가 코드
+	int origin_priority;	  // 원래의 우선순위
+	struct lock wait_on_lock; // nested donation (중첩된 기부를 위한 데이터 구조)
+	struct list donations;	  // multiple donation (다중 기부를 위한 데이터 구조)
+	struct list_elem d_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

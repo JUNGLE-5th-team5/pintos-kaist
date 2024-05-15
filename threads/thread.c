@@ -442,7 +442,6 @@ void thread_yield(void)
 
 		// 우선순위 정렬 추가된 코드
 		list_insert_ordered(&ready_list, &curr->elem, cmp_priority, NULL);
-		// curr->status = THREAD_READY;
 	}
 
 	do_schedule(THREAD_READY);
@@ -550,6 +549,7 @@ void preemption_priority(void)
 void thread_set_priority(int new_priority)
 {
 	thread_current()->priority = new_priority;
+	thread_current()->origin_priority = new_priority;
 
 	// 선점 코드 추가
 	preemption_priority();
@@ -726,6 +726,7 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	t->origin_priority = priority; // donaiton 추가 코드
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

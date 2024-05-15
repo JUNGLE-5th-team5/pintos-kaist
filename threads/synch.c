@@ -179,6 +179,15 @@ sema_test_helper(void *sema_)
    acquire and release it.  When these restrictions prove
    onerous, it's a good sign that a semaphore should be used,
    instead of a lock. */
+/* LOCK을 초기화합니다. LOCK은 주어진 시간에 최대 한 개의 스레드만이 소유할 수 있습니다.
+   우리의 락은 "재귀적"이지 않습니다. 즉, 현재 락을 보유하고 있는 스레드가 그 락을 획득하려고
+   시도하는 것은 오류입니다.
+
+   락은 초기 값이 1인 세마포어의 특수화입니다. 락과 세마포어의 차이점은 두 가지입니다.
+	첫째, 세마포어는 1보다 큰 값을 가질 수 있지만, 락은 한 번에 한 개의 스레드만이 소유할 수 있습니다.
+   둘째, 세마포어는 소유자가 없습니다. 즉, 한 스레드가 세마포어를 "다운"할 수 있고
+   그 다음에 다른 스레드가 "업"할 수 있지만, 락에서는 같은 스레드가 락을 획득하고 해제해야 합니다.
+   이러한 제한이 부담스러울 때, 락 대신에 세마포어를 사용하는 것이 좋은 신호입니다,. */
 void lock_init(struct lock *lock)
 {
 	ASSERT(lock != NULL);
@@ -195,14 +204,29 @@ void lock_init(struct lock *lock)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+/* LOCK을 획득합니다. 필요한 경우 사용 가능해질 때까지 대기합니다.
+   이 락은 현재 스레드에 의해 이미 보유되어 있지 않아야 합니다.
+
+   이 함수는 sleep 상태가 될 수 있으므로, 인터럽트 핸들러 내에서는 호출되어서는 안 됩니다.
+   이 함수는 인터럽트가 비활성화된 상태에서 호출될 수 있지만,
+   sleep 상태가 필요한 경우 인터럽트가 다시 켜집니다. */
 void lock_acquire(struct lock *lock)
 {
+	struct thread *cur = thread_current(); // 락을 요청한 스레드를 가져온다.
+
 	ASSERT(lock != NULL);
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
+	/* 락이 이미 다른 스레드에 의해 보유되고 있고, 현재 스레드의 우선순위가 더 높은 경우 */
+	if (lock->holder != NULL && cur->priority > lock->holder->priority)
+	{
+		/* 락 소유 스레드의 우선순위를 현재 스레드의 우선순위로 변경한다. */
+		lock->holder->priority = cur->priority;
+	}
+
 	sema_down(&lock->semaphore);
-	lock->holder = thread_current();
+	lock->holder = cur;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -230,10 +254,17 @@ bool lock_try_acquire(struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
+/* 현재 스레드가 소유하고 있는 LOCK을 해제합니다.
+   이것은 lock_release 함수입니다.
+   인터럽트 핸들러는 락을 획득할 수 없으므로,
+인터럽트 핸들러 내에서 락을 해제하려고 시도하는 것은 의미가 없습니다. */
 void lock_release(struct lock *lock)
 {
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
+
+	// 락 소유자의 우선순위를 원상복구 시켜준다.
+	lock->holder->priority = lock->holder->origin_priority;
 
 	lock->holder = NULL;
 	sema_up(&lock->semaphore);
@@ -301,6 +332,16 @@ void cond_init(struct condition *cond)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+/* 원자적으로 LOCK을 해제하고 COND가 다른 코드에 의해 신호를 받을 때까지 대기합니다.
+   COND가 신호를 받은 후에는 반환하기 전에 LOCK을 다시 획득합니다. 이 함수를 호출하기 전에 LOCK이 보유되어 있어야 합니다.
+
+   이 함수에 의해 구현된 모니터는 "Mesa" 스타일이며, "Hoare" 스타일이 아닙니다. 즉, 신호를 보내고 받는 것은 원자적인 연산이 아닙니다.
+   따라서 일반적으로 호출자는 대기가 완료된 후에 조건을 다시 확인하고 필요한 경우 다시 대기해야 합니다.
+
+   주어진 조건 변수는 단 하나의 락과만 연관되지만, 하나의 락은 여러 개의 조건 변수와 연관될 수 있습니다. 즉, 락에서 조건 변수로의 일대다 매핑이 있습니다.
+
+   이 함수는 sleep 상태가 될 수 있으므로, 인터럽트 핸들러 내에서는 호출되어서는 안 됩니다.
+   이 함수는 인터럽트가 비활성화된 상태에서 호출될 수 있지만, sleep 상태가 필요한 경우 인터럽트가 다시 켜집니다. */
 void cond_wait(struct condition *cond, struct lock *lock)
 {
 	struct semaphore_elem waiter;
