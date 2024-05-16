@@ -548,8 +548,10 @@ void preemption_priority(void)
  이는 스레드 스케줄링에 있어서 해당 스레드의 실행 우선 순위를 조정하는 데 사용됩니다.*/
 void thread_set_priority(int new_priority)
 {
-	thread_current()->priority = new_priority;
+	// thread_current()->priority = new_priority;
 	thread_current()->origin_priority = new_priority;
+
+	refresh_priority();
 
 	// 선점 코드 추가
 	preemption_priority();
@@ -725,6 +727,10 @@ init_thread(struct thread *t, const char *name, int priority)
 	strlcpy(t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
+	// donate  추가된 코드
+	t->wait_on_lock = NULL;
+	list_init(&t->donations);
+
 	t->magic = THREAD_MAGIC;
 	t->origin_priority = priority; // donaiton 추가 코드
 }

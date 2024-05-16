@@ -98,9 +98,9 @@ struct thread
 	struct list_elem elem; /* List element. */
 
 	// donation 추가 코드
-	int origin_priority;	  // 원래의 우선순위
-	struct lock wait_on_lock; // nested donation (중첩된 기부를 위한 데이터 구조)
-	struct list donations;	  // multiple donation (다중 기부를 위한 데이터 구조)
+	int origin_priority;	   // 원래의 우선순위
+	struct lock *wait_on_lock; // nested donation (중첩된 기부를 위한 데이터 구조)
+	struct list donations;	   // multiple donation (다중 기부를 위한 데이터 구조)
 	struct list_elem d_elem;
 
 #ifdef USERPROG

@@ -22,6 +22,9 @@ struct lock
 {
 	struct thread *holder;		/* Thread holding lock (for debugging). */
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
+	// multiple donaiton 추가된 부분
+	struct list_elem elem; /* List element for donation list. */
+	int original_priority; /* Original priority of lock holder.*/
 };
 
 void lock_init(struct lock *);
@@ -29,6 +32,9 @@ void lock_acquire(struct lock *);
 bool lock_try_acquire(struct lock *);
 void lock_release(struct lock *);
 bool lock_held_by_current_thread(const struct lock *);
+
+// donate 추가 코드
+void refresh_priority(void);
 
 /* Condition variable. */
 struct condition

@@ -212,21 +212,37 @@ void lock_init(struct lock *lock)
    sleep 상태가 필요한 경우 인터럽트가 다시 켜집니다. */
 void lock_acquire(struct lock *lock)
 {
-	struct thread *cur = thread_current(); // 락을 요청한 스레드를 가져온다.
 
 	ASSERT(lock != NULL);
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
-	/* 락이 이미 다른 스레드에 의해 보유되고 있고, 현재 스레드의 우선순위가 더 높은 경우 */
-	if (lock->holder != NULL && cur->priority > lock->holder->priority)
+	struct thread *cur = thread_current(); // 락을 요청한 스레드를 가져온다.
+	// 락의 연결 정보 저장 (nest 코드)
+	if (lock->holder != NULL)
 	{
-		/* 락 소유 스레드의 우선순위를 현재 스레드의 우선순위로 변경한다. */
-		lock->holder->priority = cur->priority;
+		cur->wait_on_lock = lock; // 락 연결정보 저장
+
+		// 추가된 코드
+		// list_push_back(&lock->holder->donations, &cur->d_elem);
+
+		// 제일 처음의 락 소유자가 나올때까지 우선순위 기부
+		while (cur->wait_on_lock != NULL)
+		{
+			// 요청한 스레드의 우선순위가 높으면 기부
+			if (cur->priority > cur->wait_on_lock->holder->priority)
+			{
+				cur->wait_on_lock->holder->priority = cur->priority;
+			}
+
+			// 다음 연결된 락소유자 찾기
+			cur = cur->wait_on_lock->holder;
+		}
 	}
 
 	sema_down(&lock->semaphore);
-	lock->holder = cur;
+	thread_current()->wait_on_lock = NULL;
+	lock->holder = thread_current();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -248,6 +264,47 @@ bool lock_try_acquire(struct lock *lock)
 	return success;
 }
 
+// lock을 해지했을 때 대기 리스트에서 해당 엔트리를 삭제하기 위한 함수
+// 현재 스레드의 대기 리스트를 확인하여 해지할 lock을 보유하고 있는 엔트리 삭제
+void remove_with_lock(struct lock *lock)
+{
+	struct thread *t = thread_current();
+	struct list_elem *curr = list_begin(&t->donations);
+	struct thread *curr_thread = NULL;
+
+	while (curr != list_end(&t->donations))
+	{
+		curr_thread = list_entry(curr, struct thread, d_elem);
+
+		if (curr_thread->wait_on_lock == lock)
+		{
+			list_remove(&curr_thread->d_elem);
+		}
+		curr = list_next(curr);
+	}
+}
+
+void refresh_priority(void)
+{
+	struct thread *t = thread_current();
+	t->priority = t->origin_priority;
+
+	if (list_empty(&t->donations))
+	{
+		return;
+	}
+
+	list_sort(&t->donations, cmp_priority, NULL);
+
+	struct list_elem *max_elem = list_front(&t->donations);
+	struct thread *max_thread = list_entry(max_elem, struct thread, d_elem);
+
+	if (t->priority < max_thread->priority)
+	{
+		t->priority = max_thread->priority;
+	}
+}
+
 /* Releases LOCK, which must be owned by the current thread.
    This is lock_release function.
 
@@ -263,6 +320,9 @@ void lock_release(struct lock *lock)
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
 
+	// remove_with_lock(lock);
+	// refresh_priority();
+
 	// 락 소유자의 우선순위를 원상복구 시켜준다.
 	lock->holder->priority = lock->holder->origin_priority;
 
@@ -273,6 +333,10 @@ void lock_release(struct lock *lock)
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
    a lock would be racy.) */
+/* 현재 스레드가 LOCK을 보유하고 있으면 true를 반환하고,
+ 그렇지 않으면 false를 반환합니다.
+ (다른 스레드가 락을 보유하고 있는지 테스트하는 것은 경쟁 조건이
+ 될 수 있음을 참고하세요.) */
 bool lock_held_by_current_thread(const struct lock *lock)
 {
 	ASSERT(lock != NULL);
