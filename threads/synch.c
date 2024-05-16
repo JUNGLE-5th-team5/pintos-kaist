@@ -223,8 +223,8 @@ void lock_acquire(struct lock *lock)
 	{
 		cur->wait_on_lock = lock; // 락 연결정보 저장
 
-		// 추가된 코드
-		// list_push_back(&lock->holder->donations, &cur->d_elem);
+		// multiple 추가된 코드
+		list_push_back(&lock->holder->donations, &cur->d_elem);
 
 		// 제일 처음의 락 소유자가 나올때까지 우선순위 기부
 		while (cur->wait_on_lock != NULL)
@@ -264,8 +264,8 @@ bool lock_try_acquire(struct lock *lock)
 	return success;
 }
 
-// lock을 해지했을 때 대기 리스트에서 해당 엔트리를 삭제하기 위한 함수
-// 현재 스레드의 대기 리스트를 확인하여 해지할 lock을 보유하고 있는 엔트리 삭제
+// lock을 해지했을 때 대기 리스트에서 해당 스레드를 삭제하기 위한 함수
+// 현재 스레드의 대기 리스트(donations)를 확인하여 해지할 lock을 보유하고 있는 스레드 삭제
 void remove_with_lock(struct lock *lock)
 {
 	struct thread *t = thread_current();
@@ -284,6 +284,7 @@ void remove_with_lock(struct lock *lock)
 	}
 }
 
+// 우선순위 업데이트 함수
 void refresh_priority(void)
 {
 	struct thread *t = thread_current();
@@ -320,13 +321,11 @@ void lock_release(struct lock *lock)
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
 
-	// remove_with_lock(lock);
-	// refresh_priority();
-
-	// 락 소유자의 우선순위를 원상복구 시켜준다.
-	lock->holder->priority = lock->holder->origin_priority;
-
+	// 락을 해제하고, 업데이트해줌.
 	lock->holder = NULL;
+	remove_with_lock(lock);
+	refresh_priority();
+
 	sema_up(&lock->semaphore);
 }
 
