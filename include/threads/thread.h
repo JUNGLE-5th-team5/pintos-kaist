@@ -102,6 +102,8 @@ struct thread
 	struct lock *wait_on_lock; // nested donation (중첩된 기부를 위한 데이터 구조)
 	struct list donations;	   // multiple donation (다중 기부를 위한 데이터 구조)
 	struct list_elem d_elem;
+	int nice;		// mlfqs 추가 (정수)
+	int recent_cpu; // mlfqs 추가  (실수)
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

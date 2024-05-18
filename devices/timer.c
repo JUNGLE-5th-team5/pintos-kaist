@@ -143,6 +143,7 @@ void timer_print_stats(void)
 
 /* Timer interrupt handler. */
 // PROJECT1 수정해야할 부분
+// mlfqs 수정 -> 매초마다 recent_cpu 계산
 static void
 timer_interrupt(struct intr_frame *args UNUSED)
 {
@@ -153,11 +154,15 @@ timer_interrupt(struct intr_frame *args UNUSED)
 	   check sleep list and the global tick.
 	   find any threads to wake up,
 	   move them to the ready list if necessary.
-	   update the global tick.
-	*/
-
+	   update the global tick. */
 	// 깨어날 스레드가 있다면 sleep_list에서 ready_list로 삽입
 	thread_wakeup(ticks); // 일어나야할 시간을 인수로 넘겨줌
+
+	// recent_cpu 계산하기
+	// int recent_cpu;
+	// recent_cpu = thread_get_recent_cpu();
+
+	// 모든 스레드의 우선순위 다시 계산하기
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

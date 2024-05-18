@@ -31,6 +31,9 @@ static struct list ready_list;
 // 스레드 sleep 상태를 보관하기 위한 list
 static struct list sleep_list;
 
+// 모든 스레드를 저장하는 list
+// static struct list all_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -56,6 +59,7 @@ static unsigned thread_ticks; /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+// int load_avg; // mlfqs 추가
 
 static void kernel_thread(thread_func *, void *aux);
 
@@ -90,6 +94,21 @@ static tid_t allocate_tid(void);
  * 스레드 시작을 위한 전역 디스크립터 테이블이다.
  * gdt는 thread_init 이후에 설정될 것이기 때문에, 우리는 먼저 임시 gdt를 설정해야한다. */
 static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
+
+/*-------------------mlfq 매크로함수 정의----------------------------*/
+// #define FIXED_POINT 16384					  // 1 << 14 => 2의 14승 = 16384
+// #define INT_TO_FP(n) ((n) * FIXED_POINT)	  // convert n to fixed point (n*f)
+// #define FP_TO_INT_ZERO(x) ((x) / FIXED_POINT) // convert x to integer (n/f)
+// #define FP_TO_INT_ROUND(x) (((x) >= 0) ? ((x) + FIXED_POINT / 2) / FIXED_POINT : ((x) - FIXED_POINT / 2) / FIXED_POINT)
+// #define ADD_XY(x, y) ((x) + (y))							 // add x and y (x+y)
+// #define SUBTRACT_Y_FROM_X(x, y) ((x) - (y))					 // subtract y from x (x-y)
+// #define ADD_XN(x, n) ((x) + INT_TO_FP(n))					 // Add x and n (x+n*f)
+// #define SUBTRACT_N_FROM_X(x, n) ((x) - INT_TO_FP(n))		 // Subtract n from x (x-n*f)
+// #define MULTIPLY_XY(x, y) ((int64_t)(x) * (y) / FIXED_POINT) // Multiply x by y ((int64_t)x * y / f)
+// #define MULTIPLY_XN(x, n) ((x) * (n))						 // Multiply x by n (x*n)
+// #define DIVIDE_XY(x, y) ((int64_t)(x) * FIXED_POINT / (y))	 // Divde x by y ((int64_t)(x) * f / y)
+// #define DIVIDE_XN(x, n) ((x) / (n))							 // Divde x by n (x / n)
+/*-----------------------------------------------------------------------*/
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -144,6 +163,7 @@ void thread_init(void)
 	lock_init(&tid_lock);
 	list_init(&ready_list);
 	list_init(&sleep_list); // slepp_list 초기화 코드 추가
+	// list_init(&all_list);	// all_list 초기화 코드 추가
 	list_init(&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -340,6 +360,9 @@ void thread_unblock(struct thread *t)
 
 	// 우선순위전 코드
 	// list_push_back(&ready_list, &t->elem);
+
+	// all_list에 스레드 추가
+	// list_push_back(&all_list, &t->elem);
 
 	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL); // 우선순위 정렬 추가된 코드
 	t->status = THREAD_READY;
@@ -544,10 +567,18 @@ void preemption_priority(void)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 /* 현재 스레드의 우선순위를 NEW_PRIORITY로 설정합니다.
 
- 이 코드는 현재 실행 중인 스레드의 우선순위를 새로운 값인 NEW_PRIORITY로 변경하는 기능을 설명합니다.
- 이는 스레드 스케줄링에 있어서 해당 스레드의 실행 우선 순위를 조정하는 데 사용됩니다.*/
+ 이 코드는 현재 실행 중인 스레드의 우선순위를
+ 새로운 값인 NEW_PRIORITY로 변경하는 기능을 설명합니다.
+ 이는 스레드 스케줄링에 있어서 해당 스레드의 실행 우선 순위를
+ 조정하는 데 사용됩니다.*/
 void thread_set_priority(int new_priority)
 {
+	// mlfqs를 사용하면 비활성화
+	if (thread_mlfqs)
+	{
+		return;
+	}
+
 	// thread_current()->priority = new_priority;
 	thread_current()->origin_priority = new_priority;
 
@@ -601,17 +632,45 @@ int thread_get_nice(void)
 int thread_get_load_avg(void)
 {
 	/* TODO: Your implementation goes here */
+	// int load_avg_int;
+	// size_t ready_threads;
+
+	// // 실행중인 스레드가 idle 스레드가 아니면 readys_threads 값 추가
+	// if (thread_current() != idle_thread)
+	// {
+	// 	ready_threads++;
+	// }
+
+	// // ready_list size 계산
+	// ready_threads += list_size(&ready_list);
+
+	// load_avg = (59 / 60) * INT_TO_FP(load_avg) + (1 / 60) * ready_threads;
+	// load_avg_int = FP_TO_INT_ROUND(load_avg);
+	// return load_avg_int * 100;
 	return 0;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 /* 현재 스레드의 recent_cpu 값의 100배를 반환합니다.
-이 코드는 현재 실행 중인 스레드의 recent_cpu 값(스레드가 최근에 사용한 CPU 시간의 양을 나타내는 값)을
-100배 증가시켜 반환하는 기능을 설명합니다. 이는 스레드의 CPU 사용량을 나타내는 지표로 사용됩니다.
+이 코드는 현재 실행 중인 스레드의 recent_cpu 값
+(스레드가 최근에 사용한 CPU 시간의 양을 나타내는 값)을
+100배 증가시켜 반환하는 기능을 설명합니다.
+이는 스레드의 CPU 사용량을 나타내는 지표로 사용됩니다.
 */
 int thread_get_recent_cpu(void)
 {
 	/* TODO: Your implementation goes here */
+	// int recent_cpu = thread_current()->recent_cpu;
+	// int load_avg_int = thread_get_load_avg();
+	// int recent_cpu_int;
+
+	// // decay 계산
+	// int decay = (2 * load_avg_int) / (2 * load_avg_int + 1);
+
+	// // 실행중인 스레드의 최근 cpu 사용량 계산
+	// recent_cpu = FP_TO_INT_ROUND(decay) * FP_TO_INT_ZERO(recent_cpu) + thread_current()->nice;
+	// recent_cpu_int = FP_TO_INT_ZERO(recent_cpu);
+	// return recent_cpu_int;
 	return 0;
 }
 
@@ -727,12 +786,14 @@ init_thread(struct thread *t, const char *name, int priority)
 	strlcpy(t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
+	t->magic = THREAD_MAGIC;
+
 	// donate  추가된 코드
 	t->wait_on_lock = NULL;
 	list_init(&t->donations);
-
-	t->magic = THREAD_MAGIC;
-	t->origin_priority = priority; // donaiton 추가 코드
+	t->origin_priority = priority;
+	t->nice = 0;
+	t->recent_cpu = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

@@ -280,7 +280,7 @@ list_pop_back(struct list *list)
 /* Returns the front element in LIST.
    Undefined behavior if LIST is empty. */
 struct list_elem *
-list_front(struct list *list)
+w(struct list *list)
 {
 	ASSERT(!list_empty(list));
 	return list->head.next;
