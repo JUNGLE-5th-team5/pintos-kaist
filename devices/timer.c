@@ -72,6 +72,7 @@ void timer_calibrate(void)
 }
 
 /* Returns the number of timer ticks since the OS booted. */
+// 운영 체제(OS)가 부팅된 이후부터 현재까지 경과한 시간을 타이머 틱(tick) 단위로 반환
 int64_t
 timer_ticks(void)
 {
@@ -149,12 +150,24 @@ timer_interrupt(struct intr_frame *args UNUSED)
 	ticks++;
 	thread_tick(); // update the cpu usage for running process
 
-	/* code to add:
-	   check sleep list and the global tick.
-	   find any threads to wake up,
-	   move them to the ready list if necessary.
-	   update the global tick.
-	*/
+	/* 4BSD scheduler */
+	if (thread_mlfqs)
+	{
+		mlfqs_increase_recent_cpu();
+
+		/* 매초마다 load_avg와 recent_cpu를 업데이트 */
+		if (timer_ticks() % TIMER_FREQ == 0)
+		{
+			mlfqs_calculate_load_avg();
+			mlfqs_recalculate_recent_cpu();
+		}
+
+		/* 4 tick마다 우선순위를 재계산 */
+		if (timer_ticks() % 4 == 0)
+		{
+			mlfqs_recalculate_priority();
+		}
+	}
 
 	// 깨어날 스레드가 있다면 sleep_list에서 ready_list로 삽입
 	thread_wakeup(ticks); // 일어나야할 시간을 인수로 넘겨줌
