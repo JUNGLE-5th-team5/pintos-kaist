@@ -212,6 +212,17 @@ void lock_init(struct lock *lock)
    sleep 상태가 필요한 경우 인터럽트가 다시 켜집니다. */
 void lock_acquire(struct lock *lock)
 {
+	// mlfqs 추가
+	if (thread_mlfqs)
+	{
+		ASSERT(lock != NULL);
+		ASSERT(!intr_context());
+		ASSERT(!lock_held_by_current_thread(lock));
+
+		sema_down(&lock->semaphore);
+		lock->holder = thread_current();
+		return;
+	}
 
 	ASSERT(lock != NULL);
 	ASSERT(!intr_context());
@@ -318,13 +329,25 @@ void refresh_priority(void)
 인터럽트 핸들러 내에서 락을 해제하려고 시도하는 것은 의미가 없습니다. */
 void lock_release(struct lock *lock)
 {
+
+	// mlfqs 추가
+	if (thread_mlfqs)
+	{
+		ASSERT(lock != NULL);
+		ASSERT(lock_held_by_current_thread(lock));
+
+		lock->holder = NULL;
+		sema_up(&lock->semaphore);
+		return;
+	}
+
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
 
 	// 락을 해제하고, 업데이트해줌.
-	lock->holder = NULL;
 	remove_with_lock(lock);
 	refresh_priority();
+	lock->holder = NULL;
 
 	sema_up(&lock->semaphore);
 }

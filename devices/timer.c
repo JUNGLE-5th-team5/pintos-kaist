@@ -28,6 +28,7 @@ static intr_handler_func timer_interrupt;
 static bool too_many_loops(unsigned loops);
 static void busy_wait(int64_t loops);
 static void real_time_sleep(int64_t num, int32_t denom);
+int recent_cpu; // mlfqs 추가
 
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
@@ -155,6 +156,23 @@ timer_interrupt(struct intr_frame *args UNUSED)
 	   move them to the ready list if necessary.
 	   update the global tick.
 	*/
+
+	if (thread_mlfqs)
+	{
+		mlfqs_increment(); // 현재 실행중인 스레드 recent_cpu 1씩 증가
+
+		// 4tick 마다 실행중인 스레드 priority 계산해주기
+		if (ticks % 4 == 0)
+		{
+			thread_priority_update();
+		}
+		// 1초마다 recent_cpu, load_avg 재계산
+		if (timer_ticks() % TIMER_FREQ == 0)
+		{
+			mlfqs_calculate_load_avg();
+			mlfqs_all_recent_cpu();
+		}
+	}
 
 	// 깨어날 스레드가 있다면 sleep_list에서 ready_list로 삽입
 	thread_wakeup(ticks); // 일어나야할 시간을 인수로 넘겨줌
