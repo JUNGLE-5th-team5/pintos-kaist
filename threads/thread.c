@@ -166,6 +166,7 @@ void thread_init(void)
 	lock_init(&tid_lock);
 	list_init(&ready_list);
 	list_init(&sleep_list); // slepp_list 초기화 코드 추가
+	// list_init(&all_list);	// all_list 초기화 코드 추가
 	list_init(&destruction_req);
 	list_init(&all_list); // all_list 초기화 코드 추가
 
@@ -362,6 +363,9 @@ void thread_unblock(struct thread *t)
 	// 우선순위전 코드
 	// list_push_back(&ready_list, &t->elem);
 
+	// all_list에 스레드 추가
+	// list_push_back(&all_list, &t->elem);
+
 	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL); // 우선순위 정렬 추가된 코드
 	t->status = THREAD_READY;
 
@@ -557,8 +561,10 @@ void preemption_priority(void)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 /* 현재 스레드의 우선순위를 NEW_PRIORITY로 설정합니다.
 
- 이 코드는 현재 실행 중인 스레드의 우선순위를 새로운 값인 NEW_PRIORITY로 변경하는 기능을 설명합니다.
- 이는 스레드 스케줄링에 있어서 해당 스레드의 실행 우선 순위를 조정하는 데 사용됩니다.*/
+ 이 코드는 현재 실행 중인 스레드의 우선순위를
+ 새로운 값인 NEW_PRIORITY로 변경하는 기능을 설명합니다.
+ 이는 스레드 스케줄링에 있어서 해당 스레드의 실행 우선 순위를
+ 조정하는 데 사용됩니다.*/
 void thread_set_priority(int new_priority)
 {
 
@@ -698,8 +704,10 @@ void mlfqs_all_recent_cpu(void)
 
 /* Returns 100 times the current thread's recent_cpu value. */
 /* 현재 스레드의 recent_cpu 값의 100배를 반환합니다.
-이 코드는 현재 실행 중인 스레드의 recent_cpu 값(스레드가 최근에 사용한 CPU 시간의 양을 나타내는 값)을
-100배 증가시켜 반환하는 기능을 설명합니다. 이는 스레드의 CPU 사용량을 나타내는 지표로 사용됩니다.
+이 코드는 현재 실행 중인 스레드의 recent_cpu 값
+(스레드가 최근에 사용한 CPU 시간의 양을 나타내는 값)을
+100배 증가시켜 반환하는 기능을 설명합니다.
+이는 스레드의 CPU 사용량을 나타내는 지표로 사용됩니다.
 */
 int thread_get_recent_cpu(void)
 {
@@ -879,6 +887,8 @@ init_thread(struct thread *t, const char *name, int priority)
 	strlcpy(t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
+	t->magic = THREAD_MAGIC;
+
 	// donate  추가된 코드
 	t->wait_on_lock = NULL;
 	list_init(&t->donations);
