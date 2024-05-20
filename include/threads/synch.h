@@ -1,6 +1,7 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
 
+#include <debug.h>
 #include <list.h>
 #include <stdbool.h>
 
@@ -17,6 +18,8 @@ bool sema_try_down(struct semaphore *);
 void sema_up(struct semaphore *);
 void sema_self_test(void);
 
+bool compare_sema_priority(const struct list_elem *list_a, const struct list_elem *list_b, void *aux UNUSED);
+
 /* Lock. */
 struct lock
 {
@@ -32,9 +35,6 @@ void lock_acquire(struct lock *);
 bool lock_try_acquire(struct lock *);
 void lock_release(struct lock *);
 bool lock_held_by_current_thread(const struct lock *);
-
-// donate 추가 코드
-void refresh_priority(void);
 
 /* Condition variable. */
 struct condition
