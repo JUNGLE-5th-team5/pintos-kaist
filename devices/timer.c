@@ -118,7 +118,6 @@ void timer_sleep(int64_t ticks)
 	}
 }
 
-
 /* Suspends execution for approximately MS milliseconds. */
 void timer_msleep(int64_t ms)
 {

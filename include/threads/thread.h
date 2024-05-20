@@ -1,6 +1,3 @@
-#ifndef THREAD_H
-#define THREAD_H
-
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
@@ -131,8 +128,6 @@ struct thread
 	int priority; /* Priority. */						// 스레드의 우선순위를 나타내는 정수 변수
 	int64_t local_tick;									// 스레드의 일어날 시간 변수를 저장하는 정수형 변수
 
-	int64_t wakeup_ticks;				/* csw - 일어날 시각 */
-
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; /* List element. */ // 스레드 리스트에 연결될 때 사용되는 리스트 요소
 
@@ -216,5 +211,3 @@ void mlfqs_calculate_load_avg(void);
 void mlfqs_increase_recent_cpu(void);
 void mlfqs_recalculate_priority(void);
 void mlfqs_recalculate_recent_cpu(void);
-
-#endif /* thread.h */

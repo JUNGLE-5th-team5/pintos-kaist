@@ -336,41 +336,6 @@ void thread_unblock(struct thread *t)
 	intr_set_level(old_level);
 }
 
-void thread_sleep (int64_t wakeup_time) {
-	struct thread *cur = thread_current();
-
-	if (cur != idle_thread) {		
-		enum intr_level old_level;
-		old_level = intr_disable ();
-
-		cur->wakeup_ticks = wakeup_time;		
-		list_push_back(&sleep_list, &cur->elem);
-		thread_block();		
-
-		intr_set_level (old_level);
-	}	
-}
-
-void thread_wakeup (int64_t curr_tick) {
-	struct list_elem *item;
-
-  for (item = list_begin (&sleep_list); item != list_end (&sleep_list);) {
-	struct thread *cur_thread = list_entry(item, struct thread, elem);	
-
-	if (cur_thread->wakeup_ticks <= curr_tick) {
-		enum intr_level old_level;
-		old_level = intr_disable ();				
-
-		item = list_remove (item);	// csw - list_remove는 아이템 삭제 후 다음 아이템을 반환함
-		thread_unblock(cur_thread);
-
-		intr_set_level(old_level);		
-	} else {
-		item = list_next(item);
-	}	
-  }		
-}
-
 /* Returns the name of the running thread. */
 // 실행 중인 스레드의 이름을 반환한다.f
 const char *
