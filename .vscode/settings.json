@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "synch.h": "c",
+        "thread.h": "c",
+        "stdio.h": "c",
+        "interrupt.h": "c",
+        "round.h": "c",
+        "string.h": "c",
+        "stdint.h": "c",
+        "random.h": "c",
+        "debug.h": "c",
+        "fixed-point.h": "c",
+        "intr-stubs.h": "c"
+    }
+}
