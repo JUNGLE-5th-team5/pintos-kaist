@@ -1,7 +1,6 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
 
-#include <debug.h>
 #include <list.h>
 #include <stdbool.h>
 
@@ -17,8 +16,6 @@ void sema_down(struct semaphore *);
 bool sema_try_down(struct semaphore *);
 void sema_up(struct semaphore *);
 void sema_self_test(void);
-
-bool compare_sema_priority(const struct list_elem *list_a, const struct list_elem *list_b, void *aux UNUSED);
 
 /* Lock. */
 struct lock
