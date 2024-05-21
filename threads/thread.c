@@ -391,9 +391,6 @@ void thread_exit(void)
 #ifdef USERPROG
 	process_exit();
 #endif
-
-	// list_remove(&thread_current()->all_elem); // 여기가 아닌가보다 쓰레드가 완전하게 지워지는 곳은 do_schedule
-
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	/* 단순히 우리의 상태를 '종료됨'으로 설정하고 다른 프로세스를 스케줄한다.
@@ -402,7 +399,8 @@ void thread_exit(void)
 	 이 코드는 현재 스레드가 종료되어가는 상태임을 설정하고,
 	 다른 프로세스를 실행 스케줄로 넘기는 것을 의미합니다.
 	 그리고 schedule_tail() 함수가 호출될 때 현재 스레드는 시스템에서 제거됩니다.
-	즉, 이 주석에 설명된 기능은 스레드가 종료 절차를 밟고 있으며 곧 시스템 자원을 반환하고 스스로를 해제할 것임을 나타냅니다.*/
+	즉, 이 주석에 설명된 기능은 스레드가 종료 절차를 밟고 있으며
+	 곧 시스템 자원을 반환하고 스스로를 해제할 것임을 나타냅니다.*/
 
 	intr_disable();
 	do_schedule(THREAD_DYING);
@@ -1113,18 +1111,18 @@ void mlfqs_calculate_load_avg(void)
 	int ready_threads;
 
 	/* 현재 실행 중인 스레드가 idle_thread인지 확인
-       idle_thread는 CPU가 유휴 상태임을 나타냅니다. */
-    if (thread_current() == idle_thread)
-        /* CPU가 유휴 상태인 경우, ready_list에 있는 스레드 수를 그대로 사용 */
-        ready_threads = list_size(&ready_list);
-    else
-        /* CPU가 유휴 상태가 아닌 경우, 현재 실행 중인 스레드도 준비 상태로 간주
-           따라서, ready_list에 있는 스레드 수에 1을 더함 */
-        ready_threads = list_size(&ready_list) + 1;
-	
+	   idle_thread는 CPU가 유휴 상태임을 나타냅니다. */
+	if (thread_current() == idle_thread)
+		/* CPU가 유휴 상태인 경우, ready_list에 있는 스레드 수를 그대로 사용 */
+		ready_threads = list_size(&ready_list);
+	else
+		/* CPU가 유휴 상태가 아닌 경우, 현재 실행 중인 스레드도 준비 상태로 간주
+		   따라서, ready_list에 있는 스레드 수에 1을 더함 */
+		ready_threads = list_size(&ready_list) + 1;
+
 	// load_avg = MUL_FP(DIV_FP(CONVERT_INT_TO_FP(59), CONVERT_INT_TO_FP(60)), load_avg) + DIV_FP(CONVERT_INT_TO_FP(1), CONVERT_INT_TO_FP(60)) * ready_threads;
 	// 위와 같음
-	load_avg = MUL_FP((CONVERT_INT_TO_FP(59)/ 60), load_avg) + (CONVERT_INT_TO_FP(1) / 60) * ready_threads;
+	load_avg = MUL_FP((CONVERT_INT_TO_FP(59) / 60), load_avg) + (CONVERT_INT_TO_FP(1) / 60) * ready_threads;
 }
 
 /* 최근 CPU 사용량을 증가시키는 함수.
