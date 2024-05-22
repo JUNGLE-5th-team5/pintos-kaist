@@ -46,9 +46,9 @@ tid_t process_create_initd(const char *file_name)
 	tid_t tid;
 
 	/*첫 번째 공백 전까지의 문자열 파싱*/
-	char *token, *save_ptr;
-	token = strtok_r(file_name, " ", &save_ptr);
-	file_name = token;
+	// char *token, *save_ptr;
+	// token = strtok_r(file_name, " ", &save_ptr);
+	// file_name = token;
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
@@ -171,20 +171,21 @@ error:
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
+// start_process()
 int process_exec(void *f_name)
 {
 	char *file_name = f_name;
 	bool success;
 
 	/*인자들을 띄어쓰기 기준으로 토큰화 및 토큰의 개수 계산*/
-	char *token, *save_ptr;
-	char **parse;
-	int count = 0;
-	for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-	{
-		parse[i] = token;
-		count++; // 토큰 개수 카운트
-	}
+	// char *token, *save_ptr;
+	// char *parse[64];
+	// int count = 0;
+	// for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+	// {
+	// 	parse[count] = token;
+	// 	count++; // 토큰 개수 카운트
+	// }
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -197,12 +198,48 @@ int process_exec(void *f_name)
 	/* We first kill the current context */
 	process_cleanup();
 
+	// for argument parsing
+	char *argv[128]; // argument 배열
+	int argc = 0;	 // argument 개수
+
+	char *token;
+	char *save_ptr; // 분리된 문자열 중 남는 부분의 시작주소
+	token = strtok_r(file_name, " ", &save_ptr);
+	while (token != NULL)
+	{
+		argv[argc] = token;
+		token = strtok_r(NULL, " ", &save_ptr);
+		argc++;
+	}
+
 	/* And then load the binary */
 	success = load(file_name, &_if);
+
 	/* If load failed, quit. */
-	palloc_free_page(file_name);
 	if (!success)
+	{
+		palloc_free_page(file_name);
 		return -1;
+	}
+
+	// /*missing parts!! set up stack*/
+	// void **rspp = &_if.rsp;
+	// argument_stack(parse, count, &_if.rsp);
+	// _if.R.rdi = count;
+	// _if.R.rsi = (uint64_t)*rspp + sizeof(void *);
+
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+
+	// palloc_free_page(file_name);
+	// 스택에 인자 넣기
+
+	void **rspp = &_if.rsp;
+	argument_stack(argv, argc, rspp);			  // 문자열(인자) 및 문자열의 주소 저장
+	_if.R.rdi = argc;							  // argc를 argument_stack()에서 저장하지 않으므로 argc의 주소를 저장
+	_if.R.rsi = (uint64_t)*rspp + sizeof(void *); // argv를 argumnet_stack()에서 저장하지 않으므로 top에서 8바이트 뺀곳의 주소 즉 argv[0]의 주소를 저장
+
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)*rspp, true);
+	palloc_free_page(file_name);
 
 	/* Start switched process. */
 	do_iret(&_if);
@@ -223,6 +260,14 @@ int process_wait(tid_t child_tid UNUSED)
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+
+	// while (child_tid)
+	// {
+	// }
+	// for simple tests
+	for (int i = 0; i < 900000000; i++)
+	{
+	}
 	return -1;
 }
 
@@ -436,6 +481,10 @@ load(const char *file_name, struct intr_frame *if_)
 	/* Set up stack. */
 	if (!setup_stack(if_))
 		goto done;
+
+	/* setup argument */
+	// *(file_name + strlen(file_name)) = ' ';
+	// setup_argument(if_, file_name);
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
@@ -674,11 +723,89 @@ setup_stack(struct intr_frame *if_)
 }
 #endif /* VM */
 
-// arguments pass
-void argument_stack(char **parse, int count, void **esp)
+// 유저 스택에 프로세스 이름과 인수를 저장하는 함수
+void argument_stack(char **parse, int count, void **rsp)
 {
 	/*유저 스택에 프로그램 이름과 인자들을 저장하는 함수
 	parse: 프로그램 이름과 인자가 저장되어 있는 메모리 공간,
 	count: 인자의 개수,
-	esp: 스택 포인터를 가리키는 주소*/
+	rsp(esp): 스택 포인터를 가리키는 주소*/
+
+	/* 프로그램 이름 및 인자 (문자열) push */
+	/* 프로그램 이름 및 인자 주소들 push */
+	/* argv = parse (문자열을 가리키는 주소들의 배열을 가리킴) push	*/
+	/* argc = count (문자열의 개수 저장) push */
+	/* fake address(0) 저장 */
+
+	int i, j;
+	for (i = count - 1; i > -1; i--)
+	{
+		for (j = strlen(parse[i]); j > -1; j--)
+		{
+			// 스택 주소를 감소시키면서 인자(문자열)를 스택에 push
+			*rsp = *rsp - 1;
+			**(char **)rsp = parse[i][j];
+		}
+		parse[i] = *(char **)rsp; // 배열에 rsp 주소 넣기
+	}
+
+	// Word-align padding
+	int pad = (int)*rsp % 8;
+	for (int k = 0; k < pad; k++)
+	{
+		(*rsp)--;
+		**(uint8_t **)rsp = 0;
+	}
+
+	// Pointers to the argument strings
+	// 인자의 주소를 스택에 push
+	(*rsp) -= 8;
+	**(char ***)rsp = 0;
+
+	for (int i = count - 1; i >= 0; i--)
+	{
+		(*rsp) -= 8;
+		**(char ***)rsp = parse[i];
+	}
+
+	// Return address
+	(*rsp) -= 8;
+	**(void ***)rsp = 0;
 }
+// void argument_stack(char **argv, int argc, void **rsp)
+// {
+// 	// Save argument strings (character by character)
+// 	for (int i = argc - 1; i >= 0; i--)
+// 	{
+// 		int argv_len = strlen(argv[i]);
+// 		for (int j = argv_len; j >= 0; j--)
+// 		{
+// 			/* 스택 주소를 감소시키면서 인자를 스택에 삽입*/
+// 			(*rsp)--;
+// 			**(char **)rsp = argv[i][j]; // 1 byte
+// 		}
+// 		argv[i] = *(char **)rsp; // 배열에 rsp 주소 넣기
+// 	}
+
+// 	// Word-align padding
+// 	int pad = (int)*rsp % 8;
+// 	for (int k = 0; k < pad; k++)
+// 	{
+// 		(*rsp)--;
+// 		**(uint8_t **)rsp = 0;
+// 	}
+
+// 	// Pointers to the argument strings
+// 	(*rsp) -= 8;
+// 	**(char ***)rsp = 0;
+
+// 	for (int i = argc - 1; i >= 0; i--)
+// 	{
+// 		(*rsp) -= 8;
+// 		**(char ***)rsp = argv[i];
+// 	}
+
+// 	// Return address
+// 	(*rsp) -= 8;
+// 	**(void ***)rsp = 0;
+// }

@@ -255,14 +255,14 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Allocate thread. */
 	// 스레드 할당
-	t = palloc_get_page(PAL_ZERO);
+	t = palloc_get_page(PAL_ZERO); // 페이지 할당
 	if (t == NULL)
 		return TID_ERROR;
 
 	/* Initialize thread. */
 	// 스레드 초기화
-	init_thread(t, name, priority);
-	tid = t->tid = allocate_tid();
+	init_thread(t, name, priority); // thread 구조체 초기화
+	tid = t->tid = allocate_tid();	// tid 할당
 
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
@@ -730,6 +730,7 @@ next_thread_to_run(void)
  */
 void do_iret(struct intr_frame *tf)
 {
+	// printf("doiret됨?\n");
 	__asm __volatile(
 		"movq %0, %%rsp\n"
 		"movq 0(%%rsp),%%r15\n"
