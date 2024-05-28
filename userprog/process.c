@@ -265,6 +265,10 @@ void process_exit(void)
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+	// list_remove(&t->all_elem);
+	/* 프로세스 디스크립터에 프로세스 종료를 알림*/
+	/* 부모프로세스의 대기 상태 이탈 (세마포어 이용)*/
+	// t->status = THREAD_DYING;
 
 	process_cleanup();
 }

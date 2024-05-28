@@ -22,6 +22,7 @@ void halt(void);
 void exit(int status);
 int write(int fd, const void *buffer, unsigned length);
 int exec(const char *file);
+int open(const char *file);
 
 /* System call.
  *
@@ -63,7 +64,6 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	/* 14: sys_close*/
 
 	int syscall_number = f->R.rax;
-	uint32_t *sp = f->rsp; // 유저 스택 포인터
 	int *arg = f->R.rsi;
 
 	// 시스템 콜 번호 10번 -> SYS_WRITE
@@ -187,4 +187,8 @@ int exec(const char *file)
 	 * 자식 프로세스의 프로그램이 적재될 때까지 대기
 	 * 프로그램 적재 실패 시 -1 리턴
 	 * 프로그램 적재 성공 시 자식 프로세스의 pid 리턴*/
+}
+
+int open(const char *file)
+{
 }
