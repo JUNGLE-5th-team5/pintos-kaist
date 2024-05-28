@@ -45,17 +45,18 @@ tid_t process_create_initd(const char *file_name)
 	char *fn_copy;
 	tid_t tid;
 
-	/*첫 번째 공백 전까지의 문자열 파싱*/
-	// char *token, *save_ptr;
-	// token = strtok_r(file_name, " ", &save_ptr);
-	// file_name = token;
-
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
 	fn_copy = palloc_get_page(0);
 	if (fn_copy == NULL)
 		return TID_ERROR;
+
 	strlcpy(fn_copy, file_name, PGSIZE);
+
+	/*첫 번째 공백 전까지의 문자열 파싱*/
+	char *token, *save_ptr;
+	token = strtok_r(file_name, " ", &save_ptr);
+	file_name = token;
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create(file_name, PRI_DEFAULT, initd, fn_copy);
@@ -177,16 +178,6 @@ int process_exec(void *f_name)
 	char *file_name = f_name;
 	bool success;
 
-	/*인자들을 띄어쓰기 기준으로 토큰화 및 토큰의 개수 계산*/
-	// char *token, *save_ptr;
-	// char *parse[64];
-	// int count = 0;
-	// for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-	// {
-	// 	parse[count] = token;
-	// 	count++; // 토큰 개수 카운트
-	// }
-
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -198,7 +189,7 @@ int process_exec(void *f_name)
 	/* We first kill the current context */
 	process_cleanup();
 
-	// for argument parsing
+	/*인자들을 띄어쓰기 기준으로 토큰화 및 토큰의 개수 계산*/
 	char *argv[128]; // argument 배열
 	int argc = 0;	 // argument 개수
 
@@ -215,30 +206,25 @@ int process_exec(void *f_name)
 	/* And then load the binary */
 	success = load(file_name, &_if);
 
+	/* 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용)*/
+
 	/* If load failed, quit. */
 	if (!success)
 	{
+		/* 메모리 적재 실패 시 프로세스 디스크립터에 메모리 적재 실패*/
 		palloc_free_page(file_name);
 		return -1;
 	}
 
+	/* 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
+
 	// /*missing parts!! set up stack*/
-	// void **rspp = &_if.rsp;
-	// argument_stack(parse, count, &_if.rsp);
-	// _if.R.rdi = count;
-	// _if.R.rsi = (uint64_t)*rspp + sizeof(void *);
-
-	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-
-	// palloc_free_page(file_name);
-	// 스택에 인자 넣기
-
 	void **rspp = &_if.rsp;
 	argument_stack(argv, argc, rspp);			  // 문자열(인자) 및 문자열의 주소 저장
-	_if.R.rdi = argc;							  // argc를 argument_stack()에서 저장하지 않으므로 argc의 주소를 저장
+	_if.R.rdi = argc;							  // argc를 argument_stack()에서 저장하지 않으므로 argc의 값을 저장
 	_if.R.rsi = (uint64_t)*rspp + sizeof(void *); // argv를 argumnet_stack()에서 저장하지 않으므로 top에서 8바이트 뺀곳의 주소 즉 argv[0]의 주소를 저장
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)*rspp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)*rspp, true);
 	palloc_free_page(file_name);
 
 	/* Start switched process. */
@@ -265,7 +251,7 @@ int process_wait(tid_t child_tid UNUSED)
 	// {
 	// }
 	// for simple tests
-	for (int i = 0; i < 900000000; i++)
+	for (int i = 0; i < 700000000; i++)
 	{
 	}
 	return -1;
@@ -809,3 +795,19 @@ void argument_stack(char **parse, int count, void **rsp)
 // 	(*rsp) -= 8;
 // 	**(void ***)rsp = 0;
 // }
+
+// 자식 프로세스 검색 함수 구현
+struct thread *get_child_process(int pid)
+{
+	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색*/
+	/* 해당 pid가 존재하면 프로세스 디스크립터 반환*/
+	/* 리스트에 존재하지 않으면 null 리턴*/
+}
+
+// 자식 프로세스 제거 함수 구현
+void remove_child_process(struct thread *cp)
+{
+	/* 자식 리스트 제거
+	 * 프로세스 디스크립터 메모리 해제
+	 */
+}

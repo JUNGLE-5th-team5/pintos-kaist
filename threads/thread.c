@@ -277,6 +277,15 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	/* project2 userproram 프로세스 계층 구조 구현*/
+	/* 부모 프로세스 저장
+	 * 프로그램이 로드되지 않음
+	 * 프로세스가 종료되지 않음
+	 * exit 세마포어 0으로 초기화
+	 * load 세마포어 0으로 초기화
+	 * 자식 리스트에 추가
+	 * */
+
 	/* Add to run queue. */
 	// 실행 대기열에 추가한다
 	thread_unblock(t);
@@ -695,6 +704,9 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->original_priority = priority;
 	t->wait_on_lock = NULL;
 	list_init(&(t->donations));
+
+	/* project2 userprogram 프로세스 계층 구조 구현 필드추가*/
+	// list_init(&(t.children)) // 자식 리스트 초기화
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
