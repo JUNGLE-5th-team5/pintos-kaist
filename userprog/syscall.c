@@ -318,8 +318,10 @@ bool create(const char *file, unsigned initial_size)
 	/* 파일 이름과 크기에 해당하는 파일 생성 */
 	/* 파일 생성 성공 시 true 반환, 실패 시 false 반환 */
 	check_address((void *)file);
-	// 실제 파일 시스템 호출로 변경 필요
-	return filesys_create(file, initial_size);
+	lock_acquire(&filesys_lock);
+	bool succ = filesys_create(file, initial_size);
+	lock_release(&filesys_lock);
+	return succ;
 }
 
 /**
