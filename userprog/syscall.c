@@ -513,10 +513,10 @@ unsigned tell(int fd)
  */
 void close(int fd)
 {
-	if (fd < 2 || MAX_FILES <= fd) // for write-bad-fd
-	{
-		return; /* Ignore stdin and stdout. */
-	}
+	// if (fd < 2 || MAX_FILES <= fd) // for write-bad-fd
+	// {
+	// 	return; /* Ignore stdin and stdout. */
+	// }
 	// struct file *f = thread_current()->fd_table[fd]; // 파일 디스크립터 테이블에서 파일 포인터를 가져옵니다.
 	struct file *f = get_file_from_fdt(fd);
 	if (f)
