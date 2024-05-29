@@ -286,6 +286,17 @@ tid_t thread_create(const char *name, int priority,
 	 * 자식 리스트에 추가
 	 * */
 
+	/* fd값 초기화 (0,1은 표준 입력, 출력)*/
+	/* file descriptor 테이블에 메모리 할당*/
+	t->fd_table = palloc_get_multiple(PAL_ZERO, 3);
+	if (t->fd_table == NULL)
+	{
+		return TID_ERROR;
+	}
+	t->fd = 2;
+	t->fd_table[0] = 1;
+	t->fd_table[1] = 2;
+
 	/* Add to run queue. */
 	// 실행 대기열에 추가한다
 	thread_unblock(t);

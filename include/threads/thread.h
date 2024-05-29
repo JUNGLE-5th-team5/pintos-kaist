@@ -65,6 +65,10 @@ typedef int tid_t;
 /* threads/fixed-point.h */
 /*----------------------------------------------------------------------*/
 
+// file descriptor 매크로
+#define FDT_PAGES 3
+#define FDT_COUNT_LIMIT FDT_PAGES * (1 << 9) // limit fd
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -145,6 +149,15 @@ struct thread
 	/* 4BSD */
 	int nice;
 	int recent_cpu;
+
+	// file descriptor 추가
+	/* 파일 디스크립터 테이블 추가*/
+	/* 현재 테이블에 존재하는 fd값의 최대값 + 1 */
+	struct file **fd_table;
+	int fd;
+
+	// 현재 실행중인 파일 추가
+	struct file *run_file;
 
 	/* userprog 프로세스 계층 구조 구현 필드 추가*/
 	/* 부모 프로세스의 디스크립터*/

@@ -18,6 +18,9 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "threads/synch.h"
+#include "userprog/syscall.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -251,7 +254,7 @@ int process_wait(tid_t child_tid UNUSED)
 	// {
 	// }
 	// for simple tests
-	for (int i = 0; i < 700000000; i++)
+	for (int i = 0; i < 900000000; i++)
 	{
 	}
 	return -1;
@@ -261,14 +264,30 @@ int process_wait(tid_t child_tid UNUSED)
 void process_exit(void)
 {
 	struct thread *curr = thread_current();
+	uint32_t *pd;
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+
 	// list_remove(&t->all_elem);
 	/* 프로세스 디스크립터에 프로세스 종료를 알림*/
 	/* 부모프로세스의 대기 상태 이탈 (세마포어 이용)*/
 	// t->status = THREAD_DYING;
+
+	/* 프로세스에 열린 모든 파일을 닫음
+	 * 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의 최소값인 2가 될 때까지 파일을 닫음
+	 * 파일 디스크립터 테이블 메모리 해제*/
+	for (int i = 2; i < FDT_COUNT_LIMIT; i++)
+	{
+		close(i);
+	}
+
+	palloc_free_multiple(curr->fd_table, FDT_PAGES); // 파일 디스크립터 메모리 해제
+
+	/* Destroy the current process's page directory ans switch backto the kernel-only page directory.
+	 * 실행 중인 파일 close */
+	// file_close(curr->run_file);
 
 	process_cleanup();
 }
@@ -394,13 +413,24 @@ load(const char *file_name, struct intr_frame *if_)
 		goto done;
 	process_activate(thread_current());
 
+	// 락 획득
 	/* Open executable file. */
+	lock_acquire(&filesys_lock);
 	file = filesys_open(file_name);
 	if (file == NULL)
 	{
+		// 락해제
+		lock_release(&filesys_lock);
 		printf("load: %s: open failed\n", file_name);
 		goto done;
 	}
+
+	/* thread 구조체의 run_file을 현재 실행할 파일로 초기화
+	 * file_deny_write()를 이용하여 파일에 대한 write를 거부
+	 * 락 해제*/
+	t->run_file = file;
+	file_deny_write(file);
+	lock_release(&filesys_lock);
 
 	/* Read and verify executable header. */
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
@@ -814,4 +844,44 @@ void remove_child_process(struct thread *cp)
 	/* 자식 리스트 제거
 	 * 프로세스 디스크립터 메모리 해제
 	 */
+}
+
+// 파일 디스크립터 생성
+int process_add_file(struct file *f)
+{
+	/* 파일 객체를 파일 디스크립터 테이블에 추가
+	 * 파일 디스크립터의 최대값 1 증가
+	 * 파일 디스크립터 리턴*/
+	struct thread *t = thread_current();
+	struct file **fdt = t->fd_table;
+	int fd = t->fd;
+
+	while (t->fd_table[fd] != NULL && fd < FDT_COUNT_LIMIT)
+	{
+		fd++;
+	}
+
+	if (fd >= FDT_COUNT_LIMIT)
+	{
+		return -1;
+	}
+	t->fd = fd;
+	fdt[fd] = f;
+	return fd;
+}
+
+// 파일 객체를 검색
+struct file *process_get_file(int fd)
+{
+	/* 파일 디스크립터에 해당하는 파일 객체를 리턴 (file descriptor 테이블 이용)
+	 * 없을 시 NULL 리턴*/
+
+	if (fd < 0 || fd >= FDT_COUNT_LIMIT)
+	{
+		return NULL;
+	}
+
+	struct thread *t = thread_current();
+	struct file *file = t->fd_table[fd];
+	return file;
 }
