@@ -244,8 +244,7 @@ void thread_print_stats(void)
  * 제공된 코드는 새 스레드의 'priority'멤버를 PRIORITY로 설정하지만, 실제 우선 순위 스케줄링은 구현되지 않았다.
  * 우선순위 스케줄링은 문제 1-3의 목표이다.
  */
-tid_t thread_create(const char *name, int priority,
-					thread_func *function, void *aux)
+tid_t thread_create(const char *name, int priority, thread_func *function, void *aux)
 {
 	struct thread *t;
 	tid_t tid;
@@ -255,27 +254,42 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Allocate thread. */
 	// 스레드 할당
-	t = palloc_get_page(PAL_ZERO);
+	t = palloc_get_page(PAL_ZERO); // 커널 공간을 위한 4KB의 싱글 페이지를 할당한다
 	if (t == NULL)
 		return TID_ERROR;
 
 	/* Initialize thread. */
 	// 스레드 초기화
-	init_thread(t, name, priority);
-	tid = t->tid = allocate_tid();
+	init_thread(t, name, priority); // 위에서 할당한 4KB의 단일 공간에 스레드 구조체를 초기화한다. (스레드 구조체의 크기는 64바이트 또는 128바이트가 된다.)
+	tid = t->tid = allocate_tid();	// 스레드의 고유한 ID를 할당한다.
 
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	// 스케줄된 경우 kernel_thread를 호출한다.
 	// 참고) rdi는 첫 번째 인자이며, rsi는 두 번째 인자이다.
 	t->tf.rip = (uintptr_t)kernel_thread;
-	t->tf.R.rdi = (uint64_t)function;
+	t->tf.R.rdi = (uint64_t)function; // 실행하려는 함수의 주소
 	t->tf.R.rsi = (uint64_t)aux;
 	t->tf.ds = SEL_KDSEG;
 	t->tf.es = SEL_KDSEG;
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
+	/* 현재 스레드의 자식으로 추가 */
+	list_push_back(&thread_current()->child_list, &t->child_elem);
+
+	/* 파일 디스크립터 테이블 초기화 */
+	t->fd_table = palloc_get_page(PAL_ZERO);
+	if (t->fd_table == NULL)
+	{
+		palloc_free_page(t);
+		return TID_ERROR;
+	}
+
+	t->fd_table[0] = 1; // stdin 자리: 1 배정
+	t->fd_table[1] = 2; // stdout 자리: 2 배정
+	t->next_fd = 2;		// 0과 1은 표준 입력/출력에 예약
 
 	/* Add to run queue. */
 	// 실행 대기열에 추가한다
@@ -392,8 +406,6 @@ void thread_exit(void)
 	process_exit();
 #endif
 
-	// list_remove(&thread_current()->all_elem); // 여기가 아닌가보다 쓰레드가 완전하게 지워지는 곳은 do_schedule
-
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	/* 단순히 우리의 상태를 '종료됨'으로 설정하고 다른 프로세스를 스케줄한다.
@@ -405,6 +417,8 @@ void thread_exit(void)
 	즉, 이 주석에 설명된 기능은 스레드가 종료 절차를 밟고 있으며 곧 시스템 자원을 반환하고 스스로를 해제할 것임을 나타냅니다.*/
 
 	intr_disable();
+	list_remove(&thread_current()->all_elem);
+	// list_remove(&thread_current()->all_elem); // 여기가 아닌가보다 쓰레드가 완전하게 지워지는 곳은 do_schedule(X) 🚨잘못된 정보!!!
 	do_schedule(THREAD_DYING);
 	NOT_REACHED();
 }
@@ -580,13 +594,11 @@ int thread_get_recent_cpu(void)
    special case when the ready list is empty. */
 
 /* 유휴 스레드. 다른 스레드가 실행 준비가 되어 있지 않을 때 실행됩니다.
-
    유휴 스레드는 처음에 thread_start()에 의해 준비 목록에 올라갑니다.
    처음에 한 번 스케줄되며, 이때 idle_thread를 초기화하고, thread_start()가
    계속될 수 있도록 전달된 세마포어를 "up"시키고 즉시 블록됩니다.
    그 후에는 유휴 스레드가 준비 목록에 나타나지 않습니다.
    준비 목록이 비어 있을 때 특별한 경우로서 next_thread_to_run()에 의해 반환됩니다. */
-
 /* 이 코드는 시스템에 다른 스레드가 실행할 준비가 되어 있지 않을 때 실행되는 특별한 스레드인
  '유휴 스레드(idle thread)'에 대해 설명하고 있습니다. 유휴 스레드는 시스템이 시작될 때 thread_start() 함수에
   의해 준비 목록에 추가되고, 처음에 한 번 스케줄되어 필요한 초기화 작업을 수행합니다.
@@ -594,6 +606,7 @@ int thread_get_recent_cpu(void)
    초기화가 완료된 후 유휴 스레드는 더 이상 준비 목록에 나타나지 않으며,
    준비 목록이 비어 있을 때만 next_thread_to_run() 함수에 의해 선택되어 실행됩니다.
    이는 시스템에 실행할 준비가 된 다른 스레드가 없을 때 CPU가 놀지 않고 유휴 상태를 유지하도록 하는 역할을 합니다.*/
+
 static void
 idle(void *idle_started_ UNUSED)
 {
@@ -697,6 +710,23 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->original_priority = priority;
 	t->wait_on_lock = NULL;
 	list_init(&(t->donations));
+
+	// /* 파일 디스크립터 테이블 초기화 */ /* project 2 system call */
+	// for (int i = 0; i < MAX_FILES; i++)
+	// {
+	// 	t->fd_table[i] = NULL;
+	// }
+	// t->next_fd = 2; // 0과 1은 표준 입력/출력에 예약
+
+	/* project 2 system call */
+	list_init(&t->child_list);
+
+	sema_init(&t->load_sema, 0);
+	sema_init(&t->exit_sema, 0);
+	sema_init(&t->wait_sema, 0);
+
+	t->exit_status = 0;
+	t->next_fd = 2;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -871,7 +901,6 @@ thread_launch(struct thread *th)
  *  수행합니다. 또한, schedule() 함수 내에서 printf() 함수를 호출하는 것은 안전하지 않다고 언급되어 있습니다.
  *  이는 schedule() 함수가 중요한 시스템 자원을 조작하는 과정에서 발생할 수 있는 문제를 방지하기
  *  위한 주의 사항입니다.
- *
  *  */
 static void
 do_schedule(int status)
@@ -883,8 +912,10 @@ do_schedule(int status)
 		// destruction_req 리스트에서 스레드를 하나씩 가져와서 메모리 해제
 		struct thread *victim =
 			list_entry(list_pop_front(&destruction_req), struct thread, elem);
-		list_remove(&victim->all_elem); // all_list에서 스레드 제거 // all_elem 삭제를 thread_exit()이 아닌 do_schedule에서 해주어야한다.
-		palloc_free_page(victim);		// 스레드의 메모리 해제
+		// list_remove(&victim->all_elem); // all_list에서 스레드 제거
+		// all_elem 삭제를 thread_exit()이 아닌 do_schedule에서 해주어야한다(X) 🚨잘못된 정보!!!
+		// 정정-> thread_exit()에서 해줘도 무방 THREAD_DYING 상태에 접어 든 쓰레드는 all_list에서 제거해줘도 무방하다.
+		palloc_free_page(victim); // 스레드의 메모리 해제
 	}
 	thread_current()->status = status; // 현재 스레드의 상태를 설정
 	schedule();						   // 스케줄링을 다시 수행
@@ -1113,18 +1144,18 @@ void mlfqs_calculate_load_avg(void)
 	int ready_threads;
 
 	/* 현재 실행 중인 스레드가 idle_thread인지 확인
-       idle_thread는 CPU가 유휴 상태임을 나타냅니다. */
-    if (thread_current() == idle_thread)
-        /* CPU가 유휴 상태인 경우, ready_list에 있는 스레드 수를 그대로 사용 */
-        ready_threads = list_size(&ready_list);
-    else
-        /* CPU가 유휴 상태가 아닌 경우, 현재 실행 중인 스레드도 준비 상태로 간주
-           따라서, ready_list에 있는 스레드 수에 1을 더함 */
-        ready_threads = list_size(&ready_list) + 1;
-	
+	   idle_thread는 CPU가 유휴 상태임을 나타냅니다. */
+	if (thread_current() == idle_thread)
+		/* CPU가 유휴 상태인 경우, ready_list에 있는 스레드 수를 그대로 사용 */
+		ready_threads = list_size(&ready_list);
+	else
+		/* CPU가 유휴 상태가 아닌 경우, 현재 실행 중인 스레드도 준비 상태로 간주
+		   따라서, ready_list에 있는 스레드 수에 1을 더함 */
+		ready_threads = list_size(&ready_list) + 1;
+
 	// load_avg = MUL_FP(DIV_FP(CONVERT_INT_TO_FP(59), CONVERT_INT_TO_FP(60)), load_avg) + DIV_FP(CONVERT_INT_TO_FP(1), CONVERT_INT_TO_FP(60)) * ready_threads;
 	// 위와 같음
-	load_avg = MUL_FP((CONVERT_INT_TO_FP(59)/ 60), load_avg) + (CONVERT_INT_TO_FP(1) / 60) * ready_threads;
+	load_avg = MUL_FP((CONVERT_INT_TO_FP(59) / 60), load_avg) + (CONVERT_INT_TO_FP(1) / 60) * ready_threads;
 }
 
 /* 최근 CPU 사용량을 증가시키는 함수.
