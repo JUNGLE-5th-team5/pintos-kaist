@@ -468,7 +468,7 @@ void process_exit(void)
 	{
 		if (curr->fd_table[fd] != NULL)
 		{
-			file_close(curr->fd_table[fd]);
+			file_close(curr->fd_table[fd]); // file_allow_write 도 같이 해주고 있음
 			curr->fd_table[fd] = NULL;
 		}
 	}
@@ -479,9 +479,10 @@ void process_exit(void)
 	// Close the running file.
 	if (curr->run_file != NULL)
 	{
-		file_close(curr->run_file);
+		file_close(curr->run_file); // file_allow_write 도 같이 해주고 있음
 		curr->run_file = NULL;
 	}
+
 	// file_close(curr->run_file); // 현재 실행 중인 파일을 닫는다. // for rox- (실행중에 수정 못하도록)
 	// curr->run_file = NULL;
 
