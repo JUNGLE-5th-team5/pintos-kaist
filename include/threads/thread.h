@@ -73,6 +73,10 @@ typedef int tid_t;
 /* threads/fixed-point.h */
 /*----------------------------------------------------------------------*/
 
+// file descriptor 매크로
+#define FDT_PAGES 3
+#define FDT_COUNT_LIMIT FDT_PAGES * (1 << 9) // limit fd
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
