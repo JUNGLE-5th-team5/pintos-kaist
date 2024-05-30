@@ -9,37 +9,34 @@ enum intr_level
 {
 	INTR_OFF, /* Interrupts disabled. */
 	INTR_ON	  /* Interrupts enabled. */
-	enum intr_level{
-		INTR_OFF, /* Interrupts disabled. */
-		INTR_ON	  /* Interrupts enabled. */
-	};
+};
+enum intr_level intr_get_level(void);
+enum intr_level intr_set_level(enum intr_level);
+enum intr_level intr_enable(void);
+enum intr_level intr_disable(void);
+enum intr_level intr_get_level(void);
+enum intr_level intr_set_level(enum intr_level);
+enum intr_level intr_enable(void);
+enum intr_level intr_disable(void);
 
-	enum intr_level intr_get_level(void);
-	enum intr_level intr_set_level(enum intr_level);
-	enum intr_level intr_enable(void);
-	enum intr_level intr_disable(void);
-	enum intr_level intr_get_level(void);
-	enum intr_level intr_set_level(enum intr_level);
-	enum intr_level intr_enable(void);
-	enum intr_level intr_disable(void);
-
-	struct gp_registers{
-		uint64_t r15; // 일반 목적으로 사용되는 64비트 레지스터
-		uint64_t r14; // 일반 목적으로 사용되는 64비트 레지스터
-		uint64_t r13; // 일반 목적으로 사용되는 64비트 레지스터
-		uint64_t r12; // 일반 목적으로 사용되는 64비트 레지스터
-		uint64_t r11; // 일반 목적으로 사용되는 64비트 레지스터
-		uint64_t r10; // 일반 목적으로 사용되는 64비트 레지스터
-		uint64_t r9;  // 일반 목적으로 사용되는 64비트 레지스터
-		uint64_t r8;  // 일반 목적으로 사용되는 64비트 레지스터
-		uint64_t rsi; // 매개변수 전달에 사용되는 64비트 레지스터 (여기서는 RDI를 저장)
-		uint64_t rdi; // 매개변수 전달에 사용되는 64비트 레지스터 (여기서는 RSI를 저장)
-		uint64_t rbp; // 프레임 포인터로 사용되는 64비트 레지스터
-		uint64_t rdx; // 매개변수 전달 및 입출력에 사용되는 64비트 레지스터
-		uint64_t rcx; // 루프 카운터 및 매개변수 전달에 사용되는 64비트 레지스터
-		uint64_t rbx; // 베이스 레지스터로 사용되는 64비트 레지스터
-		uint64_t rax; // 반환 값 및 연산에 사용되는 64비트 레지스터
-	}
+struct gp_registers
+{
+	uint64_t r15; // 일반 목적으로 사용되는 64비트 레지스터
+	uint64_t r14; // 일반 목적으로 사용되는 64비트 레지스터
+	uint64_t r13; // 일반 목적으로 사용되는 64비트 레지스터
+	uint64_t r12; // 일반 목적으로 사용되는 64비트 레지스터
+	uint64_t r11; // 일반 목적으로 사용되는 64비트 레지스터
+	uint64_t r10; // 일반 목적으로 사용되는 64비트 레지스터
+	uint64_t r9;  // 일반 목적으로 사용되는 64비트 레지스터
+	uint64_t r8;  // 일반 목적으로 사용되는 64비트 레지스터
+	uint64_t rsi; // 매개변수 전달에 사용되는 64비트 레지스터 (여기서는 RDI를 저장)
+	uint64_t rdi; // 매개변수 전달에 사용되는 64비트 레지스터 (여기서는 RSI를 저장)
+	uint64_t rbp; // 프레임 포인터로 사용되는 64비트 레지스터
+	uint64_t rdx; // 매개변수 전달 및 입출력에 사용되는 64비트 레지스터
+	uint64_t rcx; // 루프 카운터 및 매개변수 전달에 사용되는 64비트 레지스터
+	uint64_t rbx; // 베이스 레지스터로 사용되는 64비트 레지스터
+	uint64_t rax; // 반환 값 및 연산에 사용되는 64비트 레지스터
+}
 __attribute__((packed));
 
 /* Interrupt stack frame. */
